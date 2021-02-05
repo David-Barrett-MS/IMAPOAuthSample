@@ -33,10 +33,7 @@ namespace IMAPOAuthSample
                 Console.WriteLine($"Syntax: {System.Reflection.Assembly.GetExecutingAssembly().GetName()} <TenantId> <ApplicationId>");
                 return;
             }
-            //TestIMAP(args[0], args[1]);
-            var program = new Program();
             var task = TestIMAP(args[1], args[0]);
-            //task.RunSynchronously();
             task.Wait();
         }
 
@@ -71,7 +68,7 @@ namespace IMAPOAuthSample
                 }
                 Console.WriteLine($"Token received for {authResult.Account.Username}");
 
-
+                // Use the token to connect to IMAP service
                 RetrieveMessages(authResult);
             }
             catch (MsalException ex)
@@ -133,7 +130,6 @@ namespace IMAPOAuthSample
                     ReadSSLStream();
                 }
 
-
                 // Tidy up
                 Console.WriteLine("Closing connection");
                 _sslStream.Close();
@@ -143,11 +139,12 @@ namespace IMAPOAuthSample
             {
                 Console.WriteLine(ex.Message);
             }
-
         }
 
         static string XOauth2(AuthenticationResult authResult)
         {
+            // Create the log-in code, which is a base 64 encoded combination of user and auth token
+
             string ctrlA = $"{(char)1}";
             string login = $"user={authResult.Account.Username}{ctrlA}auth=Bearer {authResult.AccessToken}{ctrlA}{ctrlA}";
             var plainTextBytes = System.Text.Encoding.UTF8.GetBytes(login);
