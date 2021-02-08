@@ -62,14 +62,14 @@ namespace IMAPOAuthSample
                 Console.WriteLine("Requesting access token (user must log-in via browser)");
                 var authResult = await pca.AcquireTokenInteractive(imapScope).ExecuteAsync();
                 if (String.IsNullOrEmpty(authResult.AccessToken))
-                {
                     Console.WriteLine("No token received");
-                    return;
-                }
-                Console.WriteLine($"Token received for {authResult.Account.Username}");
+                else
+                {
+                    Console.WriteLine($"Token received for {authResult.Account.Username}");
 
-                // Use the token to connect to IMAP service
-                RetrieveMessages(authResult);
+                    // Use the token to connect to IMAP service
+                    RetrieveMessages(authResult);
+                }
             }
             catch (MsalException ex)
             {
@@ -80,7 +80,6 @@ namespace IMAPOAuthSample
                 Console.WriteLine($"Error: {ex}");
             }
             Console.WriteLine("Finished");
-
         }
 
         static string ReadSSLStream()
@@ -104,36 +103,38 @@ namespace IMAPOAuthSample
         {
             try
             {
-                _imapClient = new TcpClient("outlook.office365.com", 993);
-                _sslStream = new SslStream(_imapClient.GetStream());
-                _sslStream.AuthenticateAsClient("outlook.office365.com");
-
-                ReadSSLStream();
-
-                //Send the users login details
-                WriteSSLStream($"$ CAPABILITY");
-                ReadSSLStream();
-
-                //Send the users login details
-                WriteSSLStream($"$ AUTHENTICATE XOAUTH2 {XOauth2(authResult)}");
-                string response = ReadSSLStream();
-                if (response.StartsWith("$ NO AUTHENTICATE"))
-                    Console.WriteLine("Authentication failed");
-                else
+                using (_imapClient = new TcpClient("outlook.office365.com", 993))
                 {
-                    // Retrieve inbox unread messages
-                    WriteSSLStream("$ STATUS INBOX (unseen)");
-                    ReadSSLStream();
+                    using (_sslStream = new SslStream(_imapClient.GetStream()))
+                    {
+                        _sslStream.AuthenticateAsClient("outlook.office365.com");
 
-                    // Log out
-                    WriteSSLStream($"$ LOGOUT");
-                    ReadSSLStream();
+                        ReadSSLStream();
+
+                        //Send the users login details
+                        WriteSSLStream($"$ CAPABILITY");
+                        ReadSSLStream();
+
+                        //Send the users login details
+                        WriteSSLStream($"$ AUTHENTICATE XOAUTH2 {XOauth2(authResult)}");
+                        string response = ReadSSLStream();
+                        if (response.StartsWith("$ NO AUTHENTICATE"))
+                            Console.WriteLine("Authentication failed");
+                        else
+                        {
+                            // Retrieve inbox unread messages
+                            WriteSSLStream("$ STATUS INBOX (unseen)");
+                            ReadSSLStream();
+
+                            // Log out
+                            WriteSSLStream($"$ LOGOUT");
+                            ReadSSLStream();
+                        }
+
+                        // Tidy up
+                        Console.WriteLine("Closing connection");
+                    }
                 }
-
-                // Tidy up
-                Console.WriteLine("Closing connection");
-                _sslStream.Close();
-                _sslStream.Close();
             }
             catch (SocketException ex)
             {
@@ -145,7 +146,7 @@ namespace IMAPOAuthSample
         {
             // Create the log-in code, which is a base 64 encoded combination of user and auth token
 
-            string ctrlA = $"{(char)1}";
+            char ctrlA = (char)1;
             string login = $"user={authResult.Account.Username}{ctrlA}auth=Bearer {authResult.AccessToken}{ctrlA}{ctrlA}";
             var plainTextBytes = System.Text.Encoding.UTF8.GetBytes(login);
             return Convert.ToBase64String(plainTextBytes);
