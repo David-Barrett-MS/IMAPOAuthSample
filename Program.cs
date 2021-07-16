@@ -25,14 +25,20 @@ namespace IMAPOAuthSample
 
         private static TcpClient _imapClient = null;
         private static SslStream _sslStream = null;
+        private static string _imapEndpoint = "outlook.office365.com";
 
         static void Main(string[] args)
         {
             if (args.Length<2)
             {
-                Console.WriteLine($"Syntax: {System.Reflection.Assembly.GetExecutingAssembly().GetName()} <TenantId> <ApplicationId>");
+                Console.WriteLine($"Syntax: {System.Reflection.Assembly.GetExecutingAssembly().GetName()} <TenantId> <ApplicationId> <IMAPEndpoint>");
+                Console.WriteLine("IMAPEndpoint is not required.  If not specified, outlook.office365.com will be used.");
                 return;
             }
+
+            if (args.Length > 2 && !String.IsNullOrEmpty(args[3]))
+                _imapEndpoint = args[3];
+
             var task = TestIMAP(args[1], args[0]);
             task.Wait();
         }
@@ -54,7 +60,7 @@ namespace IMAPOAuthSample
                 .WithRedirectUri("http://localhost")
                 .Build();
 
-            var imapScope = new string[] { "https://outlook.office.com/IMAP.AccessAsUser.All" };
+            var imapScope = new string[] { $"https://{_imapEndpoint}/IMAP.AccessAsUser.All" };
 
             try
             {
@@ -103,11 +109,11 @@ namespace IMAPOAuthSample
         {
             try
             {
-                using (_imapClient = new TcpClient("outlook.office365.com", 993))
+                using (_imapClient = new TcpClient(_imapEndpoint, 993))
                 {
                     using (_sslStream = new SslStream(_imapClient.GetStream()))
                     {
-                        _sslStream.AuthenticateAsClient("outlook.office365.com");
+                        _sslStream.AuthenticateAsClient(_imapEndpoint);
 
                         ReadSSLStream();
 
