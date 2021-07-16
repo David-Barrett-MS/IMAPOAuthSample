@@ -36,8 +36,8 @@ namespace IMAPOAuthSample
                 return;
             }
 
-            if (args.Length > 2 && !String.IsNullOrEmpty(args[3]))
-                _imapEndpoint = args[3];
+            if (args.Length > 2 && !String.IsNullOrEmpty(args[2]))
+                _imapEndpoint = args[2];
 
             var task = TestIMAP(args[1], args[0]);
             task.Wait();
