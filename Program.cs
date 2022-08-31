@@ -31,60 +31,95 @@ namespace IMAPOAuthSample
         {
             if (args.Length<2)
             {
-                Console.WriteLine($"Syntax: {System.Reflection.Assembly.GetExecutingAssembly().GetName()} <TenantId> <ApplicationId> <IMAPEndpoint>");
-                Console.WriteLine("IMAPEndpoint is not required.  If not specified, outlook.office365.com will be used.");
+                Console.WriteLine($"Syntax: {System.Reflection.Assembly.GetExecutingAssembly().GetName()} <TenantId> <ApplicationId> <SecretKey> <Mailbox>");
                 return;
             }
 
-            if (args.Length > 2 && !String.IsNullOrEmpty(args[2]))
-                _imapEndpoint = args[2];
+            Task task = null;
+            if (args.Length > 2 && !String.IsNullOrEmpty(args[2]) && !String.IsNullOrEmpty(args[3]))
+            {
+                // Application auth
+                task = TestIMAP(args[1], args[0], args[2], args[3]);
+            }
+            else
+                task = TestIMAP(args[1], args[0]);
 
-            var task = TestIMAP(args[1], args[0]);
             task.Wait();
         }
 
 
-        static async Task TestIMAP(string ClientId, string TenantId)
+        static async Task TestIMAP(string ClientId, string TenantId, string SecretKey=null, string mailbox=null)
         {
-
-            // Configure the MSAL client to get tokens
-            var pcaOptions = new PublicClientApplicationOptions
-            {
-                ClientId = ClientId,
-                TenantId = TenantId
-            };
-
-            Console.WriteLine("Building application");
-            var pca = PublicClientApplicationBuilder
-                .CreateWithApplicationOptions(pcaOptions)
-                .WithRedirectUri("http://localhost")
-                .Build();
-
             var imapScope = new string[] { $"https://{_imapEndpoint}/IMAP.AccessAsUser.All" };
 
-            try
+            Console.WriteLine("Building OAuth application");
+            if (String.IsNullOrEmpty(SecretKey))
             {
-                // Make the interactive token request
-                Console.WriteLine("Requesting access token (user must log-in via browser)");
-                var authResult = await pca.AcquireTokenInteractive(imapScope).ExecuteAsync();
-                if (String.IsNullOrEmpty(authResult.AccessToken))
-                    Console.WriteLine("No token received");
-                else
+                // Configure the MSAL client to get tokens
+                var pcaOptions = new PublicClientApplicationOptions
                 {
-                    Console.WriteLine($"Token received for {authResult.Account.Username}");
+                    ClientId = ClientId,
+                    TenantId = TenantId
+                };
 
-                    // Use the token to connect to IMAP service
-                    RetrieveMessages(authResult);
+                // Interactive sign-in
+                var pca = PublicClientApplicationBuilder
+                    .CreateWithApplicationOptions(pcaOptions)
+                    .WithRedirectUri("http://localhost")
+                    .Build();
+
+                try
+                {
+                    // Make the interactive token request
+                    Console.WriteLine("Requesting access token (user must log-in via browser)");
+                    var authResult = await pca.AcquireTokenInteractive(imapScope).ExecuteAsync();
+                    if (String.IsNullOrEmpty(authResult.AccessToken))
+                        Console.WriteLine("No token received");
+                    else
+                    {
+                        Console.WriteLine($"Token received for {authResult.Account.Username}");
+
+                        // Use the token to connect to IMAP service
+                        RetrieveMessages(authResult);
+                    }
+                }
+                catch (MsalException ex)
+                {
+                    Console.WriteLine($"Error acquiring access token: {ex}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error: {ex}");
                 }
             }
-            catch (MsalException ex)
+            else
             {
-                Console.WriteLine($"Error acquiring access token: {ex}");
+                // Application credentials (no user log-in required, we use secret key to obtain token)
+                var cca = ConfidentialClientApplicationBuilder.Create(ClientId)
+                    .WithAuthority(AzureCloudInstance.AzurePublic, TenantId)
+                    .WithClientSecret(SecretKey)
+                    .Build();
+                imapScope = new string[] { $"https://{_imapEndpoint}/.default" };
+                try
+                {
+                    // Acquire the token
+                    Console.WriteLine("Requesting access token");
+                    var authResult = await cca.AcquireTokenForClient(imapScope).ExecuteAsync();
+                    Console.WriteLine($"Token received");
+
+                    // Use the token to connect to IMAP service
+                    RetrieveMessages(authResult, mailbox);
+                }
+                catch (MsalException ex)
+                {
+                    Console.WriteLine($"Error acquiring access token: {ex}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error: {ex}");
+                }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex}");
-            }
+
             Console.WriteLine("Finished");
         }
 
@@ -105,7 +140,7 @@ namespace IMAPOAuthSample
             Console.WriteLine(Data);
         }
 
-        static void RetrieveMessages(AuthenticationResult authResult)
+        static void RetrieveMessages(AuthenticationResult authResult, string mailbox = null)
         {
             try
             {
@@ -122,7 +157,7 @@ namespace IMAPOAuthSample
                         ReadSSLStream();
 
                         //Send the users login details
-                        WriteSSLStream($"$ AUTHENTICATE XOAUTH2 {XOauth2(authResult)}");
+                        WriteSSLStream($"$ AUTHENTICATE XOAUTH2 {XOauth2(authResult, mailbox)}");
                         string response = ReadSSLStream();
                         if (response.StartsWith("$ NO AUTHENTICATE"))
                             Console.WriteLine("Authentication failed");
@@ -148,12 +183,15 @@ namespace IMAPOAuthSample
             }
         }
 
-        static string XOauth2(AuthenticationResult authResult)
+        static string XOauth2(AuthenticationResult authResult, string mailbox = null)
         {
-            // Create the log-in code, which is a base 64 encoded combination of user and auth token
+            // Create the log-in code, which is a base 64 encoded combination of mailbox (user) and auth token
 
             char ctrlA = (char)1;
-            string login = $"user={authResult.Account.Username}{ctrlA}auth=Bearer {authResult.AccessToken}{ctrlA}{ctrlA}";
+            if (String.IsNullOrEmpty(mailbox))
+                mailbox = authResult.Account.Username;
+            Console.WriteLine($"Authenticating for access to mailbox {mailbox}");
+            string login = $"user={mailbox}{ctrlA}auth=Bearer {authResult.AccessToken}{ctrlA}{ctrlA}";
             var plainTextBytes = System.Text.Encoding.UTF8.GetBytes(login);
             return Convert.ToBase64String(plainTextBytes);
         }
