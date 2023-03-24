@@ -6,10 +6,18 @@ You must register the application in Azure AD as per [this guide](https://docs.m
 
 Once the application is registered, the application can be run from a command prompt (or PowerShell console).  The syntax is:
 
-`IMAPOAuthSample TenantId ApplicationId`
+For delegate auth:
+```
+IMAPOAuthSample TenantId ApplicationId
+```
 
-If the parameters are valid, you will be prompted to log-in to the mailbox using the default system browser (IMAP only supports delegate access).  Once done, the application will use the token to log on to the mailbox and retrieve the number of unread messages in the Inbox.  The IMAP conversation will be shown in the console.
+For application auth:
+```
+IMAPOAuthSample TenantId ApplicationId SecretKey Mailbox
+```
 
-A successful test looks like this:
+When using delegate access, you will be redirected to log into the mailbox via a browser.  Application access does not require log-in.  Once a valid token is retrieved (via either flow), the application will use it to log on to the mailbox and retrieve the number of unread messages in the Inbox.  The IMAP conversation will be shown in the console.
+
+A successful test (delegate auth) looks like this:
 
 ![IMAPOAuthSample Successful Test Screenshot](https://github.com/David-Barrett-MS/IMAPOAuthSample/blob/master/IMAPOAuthSample.png?raw=true "IMAPOAuthSample Successful Test Screenshot")
