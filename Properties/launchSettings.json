@@ -2,6 +2,13 @@
   "profiles": {
     "IMAPOAuthSample": {
       "commandName": "Project"
+    },
+    "Delegated auth": {
+      "commandName": "Project",
+      "commandLineArgs": "fc69f6a8-90cd-4047-977d-0c768925b8ec e72bfa19-e362-4df1-aa9b-6697519cd331"
+    },
+    "App auth": {
+      "commandName": "Project"
     }
   }
 }
