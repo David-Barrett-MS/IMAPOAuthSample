@@ -8,8 +8,9 @@ Once the application is registered, the application can be run from a command pr
 
 For delegate auth:
 ```
-IMAPOAuthSample TenantId ApplicationId
+IMAPOAuthSample TenantId ApplicationId (RedirectURL)
 ```
+If redirect URL is not specified, it will default to http://localhost
 
 For application auth:
 ```
