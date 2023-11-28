@@ -34,6 +34,10 @@ namespace IMAPOAuthSample
         /// IMAP server address
         /// </summary>
         private static string _imapEndpoint = "outlook.office365.com";
+        /// <summary>
+        /// The redirect URL used for app auth
+        /// </summary>
+        private static string _redirectUrl = "http://localhost";
 
         /// <summary>
         /// Main entry point
@@ -41,19 +45,33 @@ namespace IMAPOAuthSample
         /// <param name="args">Command line arguments</param>
         static void Main(string[] args)
         {
-            if (args.Length<2)
+            if (args.Length<2 || args.Length>4)
             {
-                Console.WriteLine($"Syntax: {System.Reflection.Assembly.GetExecutingAssembly().GetName()} <TenantId> <ApplicationId> <SecretKey> <Mailbox>");
+                Console.WriteLine("Syntax:");
+                Console.WriteLine("");
+                Console.WriteLine("App auth:");
+                Console.WriteLine($"{System.Reflection.Assembly.GetExecutingAssembly().GetName()} <TenantId> <ApplicationId> <SecretKey> <Mailbox>");
+                Console.WriteLine("");
+                Console.WriteLine("Delegated (interactive) auth:");
+                Console.WriteLine($"{System.Reflection.Assembly.GetExecutingAssembly().GetName()} <TenantId> <ApplicationId> (<RedirectUrl>)");
+                Console.WriteLine($"If <RedirectUrl> is not specified, it defaults to {_redirectUrl}");
                 return;
             }
 
             Task task = null;
-            if (args.Length > 2 && !String.IsNullOrEmpty(args[2]) && !String.IsNullOrEmpty(args[3]))
+            if (args.Length > 3 && !String.IsNullOrEmpty(args[2]) && !String.IsNullOrEmpty(args[3]))
+            {
                 // Application auth
                 task = TestIMAP(args[1], args[0], args[2], args[3]);
+            }
             else
+            {
                 /// Interactive (delegated) auth
+                if (args.Length==3 && !String.IsNullOrEmpty(args[2]))
+                    _redirectUrl = args[2];
+                Console.WriteLine($"Using redirect URL: {_redirectUrl}");
                 task = TestIMAP(args[1], args[0]);
+            }
 
             task.Wait();
         }
@@ -71,7 +89,6 @@ namespace IMAPOAuthSample
         {
             var imapScope = new string[] { $"https://{_imapEndpoint}/IMAP.AccessAsUser.All" };
 
-            Console.WriteLine("Building OAuth application");
             if (String.IsNullOrEmpty(SecretKey))
             {
                 // Configure the MSAL client to get tokens
@@ -84,7 +101,7 @@ namespace IMAPOAuthSample
                 // Interactive sign-in
                 var pca = PublicClientApplicationBuilder
                     .CreateWithApplicationOptions(pcaOptions)
-                    .WithRedirectUri("http://localhost")
+                    .WithRedirectUri(_redirectUrl)
                     .Build();
 
                 try
@@ -122,7 +139,7 @@ namespace IMAPOAuthSample
                 try
                 {
                     // Acquire the token
-                    Console.WriteLine("Requesting access token");
+                    Console.WriteLine("Requesting access token (client credentials - no user interaction required)");
                     var authResult = await cca.AcquireTokenForClient(imapScope).ExecuteAsync();
                     Console.WriteLine($"Token received");
 
